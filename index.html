@@ -1,0 +1,756 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>צמחקביט 🌱 | סנכרון micro:bit לצמח</title>
+
+  <!-- Chart.js for graphs (CDN). If offline, graphs will show a friendly message. -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root{
+      --bg:#0b1020; --card:#141a33; --ink:#e9ecf7; --muted:#9aa3c7;
+      --good:#4ade80; --warn:#fbbf24; --bad:#f87171; --info:#60a5fa;
+      --accent:#a78bfa;
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+    }
+    body{
+      margin:0; font-family: system-ui, "Segoe UI", Arial, sans-serif;
+      background: radial-gradient(1200px 700px at 80% -10%, #1c2350, transparent),
+                  radial-gradient(900px 600px at 10% 110%, #10163a, transparent),
+                  var(--bg);
+      color:var(--ink);
+    }
+    header{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:16px 18px; position:sticky; top:0; background:rgba(11,16,32,.8);
+      backdrop-filter: blur(8px); border-bottom:1px solid rgba(255,255,255,.06);
+      z-index:10;
+    }
+    header .title{
+      font-size:20px; font-weight:700; letter-spacing:.2px;
+      display:flex; align-items:center; gap:8px;
+    }
+    header .pill{
+      font-size:12px; color:var(--muted); background:rgba(255,255,255,.06);
+      padding:4px 8px; border-radius:999px;
+    }
+
+    .wrap{ max-width:980px; margin:0 auto; padding:16px; display:grid; gap:14px; }
+    .row{ display:grid; grid-template-columns: 1.2fr .8fr; gap:14px; }
+    @media (max-width: 900px){ .row{ grid-template-columns:1fr; } }
+
+    .card{
+      background:var(--card); border:1px solid rgba(255,255,255,.06);
+      border-radius:16px; padding:14px; box-shadow: 0 10px 30px rgba(0,0,0,.35);
+    }
+    .buttons{ display:flex; flex-wrap:wrap; gap:8px; }
+    button{
+      background:rgba(255,255,255,.08); color:var(--ink); border:1px solid rgba(255,255,255,.08);
+      padding:10px 12px; border-radius:12px; cursor:pointer; font-weight:600;
+      transition:.15s transform ease, .15s background ease;
+    }
+    button:hover{ transform: translateY(-1px); background:rgba(255,255,255,.12); }
+    button.primary{ background:linear-gradient(135deg, #6ee7b7, #60a5fa); color:#081021; border:none; }
+    button.good{ background:rgba(74,222,128,.15); border-color:rgba(74,222,128,.35); }
+    button.warn{ background:rgba(251,191,36,.15); border-color:rgba(251,191,36,.35); }
+    button.bad{ background:rgba(248,113,113,.15); border-color:rgba(248,113,113,.35); }
+    button.ghost{ background:transparent; }
+
+    .status{
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      background:rgba(0,0,0,.25); border-radius:12px; padding:10px 12px; font-size:14px;
+    }
+    .status .dot{ width:9px; height:9px; border-radius:50%; background:var(--muted); margin-left:6px; display:inline-block; }
+    .status .dot.on{ background:var(--good); box-shadow:0 0 10px var(--good); }
+
+    .tabs{ display:flex; gap:6px; margin-bottom:8px; }
+    .tab{
+      padding:8px 10px; border-radius:999px; font-size:13px; color:var(--muted);
+      background:rgba(255,255,255,.06); cursor:pointer; user-select:none;
+    }
+    .tab.active{ color:var(--ink); background:rgba(167,139,250,.18); border:1px solid rgba(167,139,250,.35); }
+
+    .bigEmoji{ font-size:64px; line-height:1; }
+    .moodLine{ font-size:22px; font-weight:800; margin:6px 0 2px; }
+    .moodSub{ font-size:16px; color:var(--muted); }
+
+    .kv{ display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin-top:8px; }
+    .kv .item{ background:rgba(255,255,255,.05); padding:10px; border-radius:12px; text-align:center; }
+    .kv .label{ font-size:12px; color:var(--muted); }
+    .kv .val{ font-size:20px; font-weight:700; margin-top:3px; }
+
+    .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    @media (max-width: 600px){ .grid2{ grid-template-columns:1fr; } }
+
+    table{ width:100%; border-collapse:collapse; font-size:13px; }
+    th, td{ padding:8px; border-bottom:1px solid rgba(255,255,255,.06); text-align:right; }
+    th{ color:var(--muted); font-weight:700; position:sticky; top:0; background:var(--card); }
+    tr:hover td{ background:rgba(255,255,255,.03); }
+
+    .small{ font-size:12px; color:var(--muted); }
+    .notice{ font-size:13px; color:var(--muted); line-height:1.5; }
+
+    canvas{ background:rgba(255,255,255,.03); border-radius:12px; padding:8px; }
+
+    .footer{ text-align:center; padding:20px; color:var(--muted); font-size:12px; }
+    .hidden{ display:none !important; }
+  </style>
+</head>
+
+<body>
+<header>
+  <div class="title">צמחקביט 🌱 <span class="pill" id="groupPill">קבוצה: -</span></div>
+  <div class="buttons">
+    <button id="modeKidBtn" class="tab active">מצב ילדים</button>
+    <button id="modeTeacherBtn" class="tab">מצב מורה</button>
+    <button id="demoToggleBtn" class="ghost small">דמו: כבוי</button>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- Connection + quick actions -->
+  <section class="card">
+    <div class="status">
+      <div><span class="dot" id="btDot"></span><span id="btStatus">מנותק</span></div>
+      <div class="small" id="lastSync">סנכרון אחרון: —</div>
+    </div>
+    <div style="height:10px"></div>
+    <div class="buttons">
+      <button id="connectBtn" class="primary">התחבר / סנכרן</button>
+      <button id="disconnectBtn">נתק</button>
+      <button id="pullLatestBtn" class="good">קרא מדידה אחרונה</button>
+      <button id="pullLogsBtn" class="warn">משוך לוגים</button>
+      <button id="clearLogsBtn" class="bad">נקה לוגים על המיקרוביט</button>
+    </div>
+    <div style="margin-top:8px" class="notice">
+      * Web Bluetooth עובד רק ב-Chrome/Edge באנדרואיד או מחשב. באייפון/אייפד זה לא נתמך.
+    </div>
+  </section>
+
+  <div class="row">
+    <!-- Kid view -->
+    <section class="card" id="kidCard">
+      <div class="tabs">
+        <div class="tab active" data-kidtab="mood">מצב הצמח</div>
+        <div class="tab" data-kidtab="mini">מגמות קצרות</div>
+      </div>
+
+      <div id="kidMoodView">
+        <div class="bigEmoji" id="moodEmoji">🌿</div>
+        <div class="moodLine" id="moodLine">שלום! לחצו סנכרון.</div>
+        <div class="moodSub" id="moodSub">אני מחכה למדידות…</div>
+
+        <div class="kv">
+          <div class="item">
+            <div class="label">לחות קרקע</div>
+            <div class="val" id="soilVal">—</div>
+          </div>
+          <div class="item">
+            <div class="label">אור</div>
+            <div class="val" id="lightVal">—</div>
+          </div>
+          <div class="item">
+            <div class="label">טמפרטורה</div>
+            <div class="val" id="tempVal">—</div>
+          </div>
+        </div>
+
+        <div style="margin-top:10px" class="buttons">
+          <button id="speakBtn">🔊 השמע משפט</button>
+          <button id="openCanvaBtn" class="ghost">פתח עמוד אמוג׳י של הקבוצה</button>
+        </div>
+      </div>
+
+      <div id="kidMiniView" class="hidden">
+        <div class="grid2">
+          <div>
+            <div class="small">לחות – 24 שעות</div>
+            <canvas id="miniSoil" height="160"></canvas>
+          </div>
+          <div>
+            <div class="small">אור – 24 שעות</div>
+            <canvas id="miniLight" height="160"></canvas>
+          </div>
+        </div>
+        <div style="margin-top:10px">
+          <div class="small">טמפרטורה – 24 שעות</div>
+          <canvas id="miniTemp" height="160"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Teacher / logs view -->
+    <section class="card" id="teacherCard" class="hidden">
+      <div class="tabs">
+        <div class="tab active" data-teachertab="summary">סיכום</div>
+        <div class="tab" data-teachertab="graphs">גרפים</div>
+        <div class="tab" data-teachertab="table">טבלה</div>
+      </div>
+
+      <div id="teacherSummaryView">
+        <div class="grid2">
+          <div class="item" style="background:rgba(255,255,255,.05); padding:10px; border-radius:12px;">
+            <div class="label small">כמות דגימות</div>
+            <div class="val" id="countVal">0</div>
+          </div>
+          <div class="item" style="background:rgba(255,255,255,.05); padding:10px; border-radius:12px;">
+            <div class="label small">טווח זמן</div>
+            <div class="val" id="spanVal">—</div>
+          </div>
+        </div>
+
+        <div style="height:10px"></div>
+        <div class="buttons">
+          <button id="downloadCsvBtn" class="good">הורד CSV</button>
+          <button id="openSheetsBtn" class="warn">פתח בגוגל שיטס</button>
+        </div>
+
+        <div style="margin-top:8px" class="notice">
+          הטיפ: הורידו CSV → פתחו Google Sheets → File → Import → Upload.
+        </div>
+      </div>
+
+      <div id="teacherGraphsView" class="hidden">
+        <div class="small">לחות קרקע לאורך זמן</div>
+        <canvas id="soilChart" height="180"></canvas>
+        <div style="height:8px"></div>
+
+        <div class="small">עוצמת אור לאורך זמן</div>
+        <canvas id="lightChart" height="180"></canvas>
+        <div style="height:8px"></div>
+
+        <div class="small">טמפרטורה לאורך זמן</div>
+        <canvas id="tempChart" height="180"></canvas>
+      </div>
+
+      <div id="teacherTableView" class="hidden" style="max-height:420px; overflow:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>זמן</th>
+              <th>לחות</th>
+              <th>אור</th>
+              <th>טמפ׳ (°C)</th>
+              <th>uptime (ש׳)</th>
+            </tr>
+          </thead>
+          <tbody id="logTbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </div>
+
+  <section class="card">
+    <div class="notice">
+      <b>פרוטוקול צפוי מהמיקרוביט (להמשך):</b><br/>
+      - הדפדפן ישלח שורות טקסט ב-UART BLE.<br/>
+      - פקודות:<br/>
+      &nbsp;&nbsp;GET_LATEST → המיקרוביט יחזיר: <code>SAMPLE,uptime_ms,soil,light,temp</code><br/>
+      &nbsp;&nbsp;GET_LOGS → המיקרוביט יחזיר הרבה שורות SAMPLE ואז <code>END</code><br/>
+      &nbsp;&nbsp;CLEAR_LOGS → מוחק קובץ לוגים (מחזיר OK).<br/>
+      - השורות מופרדות ב-\n. כרגע יש מצב דמו עד שהלוח יגיע.
+    </div>
+  </section>
+
+</main>
+
+<div class="footer">צמחקביט 🌱 | Web Bluetooth + Canva hybrid</div>
+
+<script>
+/** ------------------------------
+ *  CONFIG (edit later as needed)
+ *  ------------------------------ */
+
+// micro:bit UART Service UUIDs (Nordic UART)
+const UART_SERVICE = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+const UART_RX      = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"; // write
+const UART_TX      = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"; // notify
+
+// URL param group
+const params = new URLSearchParams(location.search);
+const groupId = params.get("group") || "-";
+document.getElementById("groupPill").textContent = "קבוצה: " + groupId;
+
+// Canva URL mapping per group (placeholder).
+// Later you can load this from a Google Sheet.
+const CANVA_MAP = {
+  "A": { happy:"https://example.com/happyA", dry:"https://example.com/dryA", dark:"https://example.com/darkA", hot:"https://example.com/hotA" },
+  "B": { happy:"https://example.com/happyB", dry:"https://example.com/dryB", dark:"https://example.com/darkB", hot:"https://example.com/hotB" }
+};
+
+// Moods in Hebrew + emojis
+const MOODS = {
+  happy: { emoji:"😊🌿", line:"אני שמחה!", sub:"הכל מרגיש לי בדיוק נכון.", tts:"אני שמחה. הכל מרגיש לי בדיוק נכון." },
+  a_bit_dry: { emoji:"😐💧", line:"אני קצת צמאה", sub:"עוד מעט כדאי להשקות אותי.", tts:"אני קצת צמאה. עוד מעט כדאי להשקות אותי." },
+  too_dry: { emoji:"😣🏜️", line:"אני יבשה מדי!", sub:"בבקשה להשקות אותי בקרוב.", tts:"אני יבשה מדי. בבקשה להשקות אותי בקרוב." },
+  too_wet: { emoji:"😵‍💫🌊", line:"יש לי יותר מדי מים", sub:"תנו לי זמן להתייבש.", tts:"יש לי יותר מדי מים. תנו לי זמן להתייבש." },
+  too_dark:{ emoji:"😴🌑", line:"חשוך לי", sub:"אני רוצה יותר אור.", tts:"חשוך לי. אני רוצה יותר אור." },
+  too_hot: { emoji:"🥵☀️", line:"חם לי מדי", sub:"אולי קצת צל יעזור.", tts:"חם לי מדי. אולי קצת צל יעזור." },
+  too_cold:{ emoji:"🥶❄️", line:"קר לי", sub:"אפשר מקום חמים יותר?", tts:"קר לי. אפשר מקום חמים יותר?" },
+  confused:{ emoji:"🤖❓", line:"משהו לא ברור לי", sub:"בדקו את החיישנים בבקשה.", tts:"משהו לא ברור לי. בדקו את החיישנים בבקשה." }
+};
+
+// Thresholds (tune later)
+const TH = {
+  soilTooDry: 25,
+  soilABitDry: 35,
+  soilTooWet: 80,
+  lightTooDark: 20,
+  tempTooHot: 32,
+  tempTooCold: 12
+};
+
+
+/** ------------------------------
+ *  STATE
+ *  ------------------------------ */
+let demoMode = false;
+
+let device, server, rxChar, txChar;
+let notifyBuffer = "";
+let connected = false;
+
+let logs = []; // {uptime_ms, soil, light, temp, absDate: Date}
+let lastLatest = null;
+
+let charts = { soil:null, light:null, temp:null, miniSoil:null, miniLight:null, miniTemp:null };
+
+/** ------------------------------
+ *  UI helpers
+ *  ------------------------------ */
+const el = id => document.getElementById(id);
+const btDot = el("btDot");
+const btStatus = el("btStatus");
+const lastSyncEl = el("lastSync");
+
+function setConnectedUI(on){
+  connected = on;
+  btDot.classList.toggle("on", on);
+  btStatus.textContent = on ? "מחובר" : "מנותק";
+}
+
+function formatAbsHebrew(d){
+  // HH:MM  weekday  DD/MM/YY
+  const hh = String(d.getHours()).padStart(2,"0");
+  const mm = String(d.getMinutes()).padStart(2,"0");
+  const dd = String(d.getDate()).padStart(2,"0");
+  const mo = String(d.getMonth()+1).padStart(2,"0");
+  const yy = String(d.getFullYear()).slice(-2);
+
+  const wd = ["א׳","ב׳","ג׳","ד׳","ה׳","ו׳","ש׳"][d.getDay()];
+  return `${hh}:${mm}  ${wd}  ${dd}/${mo}/${yy}`;
+}
+
+/** ------------------------------
+ *  Mood logic (simple priority)
+ *  ------------------------------ */
+function computeMood(sample){
+  if(!sample) return "confused";
+
+  const {soil, light, temp} = sample;
+
+  // Priority rules
+  if(soil <= TH.soilTooDry) return "too_dry";
+  if(soil >= TH.soilTooWet) return "too_wet";
+  if(temp >= TH.tempTooHot) return "too_hot";
+  if(temp <= TH.tempTooCold) return "too_cold";
+  if(light <= TH.lightTooDark) return "too_dark";
+  if(soil <= TH.soilABitDry) return "a_bit_dry";
+
+  return "happy";
+}
+
+/** ------------------------------
+ *  Rendering
+ *  ------------------------------ */
+function renderLatest(sample){
+  if(!sample) return;
+
+  const moodKey = computeMood(sample);
+  const mood = MOODS[moodKey];
+
+  el("moodEmoji").textContent = mood.emoji;
+  el("moodLine").textContent = mood.line;
+  el("moodSub").textContent = mood.sub;
+
+  el("soilVal").textContent = `${sample.soil}%`;
+  el("lightVal").textContent = `${sample.light}%`;
+  el("tempVal").textContent = `${sample.temp.toFixed(1)}°`;
+
+  // Link to Canva mood page if present
+  const gmap = CANVA_MAP[groupId];
+  const canvaUrl = gmap?.[moodKey] || gmap?.happy || null;
+  el("openCanvaBtn").onclick = () => {
+    if(canvaUrl) window.open(canvaUrl, "_blank");
+    else alert("לא מוגדר עמוד Canva למצב הזה עדיין.");
+  };
+
+  el("speakBtn").onclick = () => speak(mood.tts);
+
+  lastLatest = {...sample, moodKey};
+}
+
+function renderTeacher(){
+  el("countVal").textContent = logs.length;
+
+  if(logs.length >= 2){
+    const spanMs = logs[logs.length-1].uptime_ms - logs[0].uptime_ms;
+    const hours = Math.floor(spanMs/3600000);
+    const mins  = Math.floor((spanMs%3600000)/60000);
+    el("spanVal").textContent = `${hours} שעות ${mins} דק׳`;
+  } else {
+    el("spanVal").textContent = "—";
+  }
+
+  // Table
+  const tbody = el("logTbody");
+  tbody.innerHTML = "";
+  logs.forEach((s,i)=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${i+1}</td>
+      <td>${s.absDate ? formatAbsHebrew(s.absDate) : "—"}</td>
+      <td>${s.soil}</td>
+      <td>${s.light}</td>
+      <td>${s.temp.toFixed(1)}</td>
+      <td>${Math.round(s.uptime_ms/1000)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // Charts
+  renderCharts();
+  renderMiniCharts();
+}
+
+function renderCharts(){
+  if(!window.Chart){
+    el("teacherGraphsView").innerHTML = "<div class='notice'>Chart.js לא נטען (כנראה בלי אינטרנט). אפשר עדיין להוריד CSV.</div>";
+    return;
+  }
+  const labels = logs.map(s => s.absDate ? formatAbsHebrew(s.absDate) : (s.uptime_ms/3600000).toFixed(2));
+  const soilData  = logs.map(s => s.soil);
+  const lightData = logs.map(s => s.light);
+  const tempData  = logs.map(s => s.temp);
+
+  charts.soil?.destroy();
+  charts.light?.destroy();
+  charts.temp?.destroy();
+
+  charts.soil = new Chart(el("soilChart"), {
+    type:"line",
+    data:{ labels, datasets:[{label:"לחות (%)", data:soilData, tension:.25}] },
+    options:{ responsive:true, plugins:{legend:{display:false}}, scales:{x:{ticks:{maxTicksLimit:6}}} }
+  });
+  charts.light = new Chart(el("lightChart"), {
+    type:"line",
+    data:{ labels, datasets:[{label:"אור (%)", data:lightData, tension:.25}] },
+    options:{ responsive:true, plugins:{legend:{display:false}}, scales:{x:{ticks:{maxTicksLimit:6}}} }
+  });
+  charts.temp = new Chart(el("tempChart"), {
+    type:"line",
+    data:{ labels, datasets:[{label:"טמפ׳ (°C)", data:tempData, tension:.25}] },
+    options:{ responsive:true, plugins:{legend:{display:false}}, scales:{x:{ticks:{maxTicksLimit:6}}} }
+  });
+}
+
+function renderMiniCharts(){
+  if(!window.Chart || logs.length < 2) return;
+
+  // last 24h (by abs time if available, else last N samples)
+  const now = new Date();
+  let slice = logs;
+  if(logs[0].absDate){
+    slice = logs.filter(s => (now - s.absDate) <= 24*3600*1000);
+  } else {
+    slice = logs.slice(-240); // arbitrary window
+  }
+
+  const labels = slice.map(s => s.absDate ? String(s.absDate.getHours()).padStart(2,"0")+":"+String(s.absDate.getMinutes()).padStart(2,"0") : Math.round(s.uptime_ms/60000)+" דק׳");
+  const soilData  = slice.map(s => s.soil);
+  const lightData = slice.map(s => s.light);
+  const tempData  = slice.map(s => s.temp);
+
+  charts.miniSoil?.destroy();
+  charts.miniLight?.destroy();
+  charts.miniTemp?.destroy();
+
+  charts.miniSoil = new Chart(el("miniSoil"), { type:"line",
+    data:{labels, datasets:[{data:soilData, tension:.25}]},
+    options:{plugins:{legend:{display:false}}, scales:{x:{display:false}, y:{ticks:{maxTicksLimit:4}}}}
+  });
+  charts.miniLight = new Chart(el("miniLight"), { type:"line",
+    data:{labels, datasets:[{data:lightData, tension:.25}]},
+    options:{plugins:{legend:{display:false}}, scales:{x:{display:false}, y:{ticks:{maxTicksLimit:4}}}}
+  });
+  charts.miniTemp = new Chart(el("miniTemp"), { type:"line",
+    data:{labels, datasets:[{data:tempData, tension:.25}]},
+    options:{plugins:{legend:{display:false}}, scales:{x:{display:false}, y:{ticks:{maxTicksLimit:4}}}}
+  });
+}
+
+/** ------------------------------
+ *  CSV export
+ *  ------------------------------ */
+function makeCsv(){
+  const header = ["timestamp","weekday","uptime_s","soil","light","temp_c"];
+  const rows = logs.map(s=>{
+    const d = s.absDate || new Date();
+    const ts = formatAbsHebrew(d);
+    const wd = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()];
+    return [ts, wd, Math.round(s.uptime_ms/1000), s.soil, s.light, s.temp.toFixed(2)];
+  });
+  return [header, ...rows].map(r=>r.join(",")).join("\n");
+}
+
+el("downloadCsvBtn").onclick = () => {
+  const csv = makeCsv();
+  const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `plant_logs_group_${groupId}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+el("openSheetsBtn").onclick = () => {
+  // open a new blank sheet, user can import CSV
+  window.open("https://sheets.new", "_blank");
+};
+
+/** ------------------------------
+ *  Web Speech TTS
+ *  ------------------------------ */
+function speak(text){
+  if(!("speechSynthesis" in window)) return alert("הדפדפן לא תומך בהקראה.");
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "he-IL";
+  u.rate = 1.0;
+  speechSynthesis.cancel();
+  speechSynthesis.speak(u);
+}
+
+/** ------------------------------
+ *  BLE logic
+ *  ------------------------------ */
+async function connectAndSync(){
+  if(demoMode){
+    runDemoSync();
+    return;
+  }
+
+  try{
+    device = await navigator.bluetooth.requestDevice({
+      filters: [{ namePrefix: "BBC micro:bit" }],
+      optionalServices: [UART_SERVICE]
+    });
+
+    device.addEventListener("gattserverdisconnected", onDisconnected);
+
+    server = await device.gatt.connect();
+    const service = await server.getPrimaryService(UART_SERVICE);
+    rxChar = await service.getCharacteristic(UART_RX);
+    txChar = await service.getCharacteristic(UART_TX);
+
+    await txChar.startNotifications();
+    txChar.addEventListener("characteristicvaluechanged", onNotify);
+
+    setConnectedUI(true);
+    lastSyncEl.textContent = "סנכרון אחרון: " + formatAbsHebrew(new Date());
+
+    // Pull latest + logs by default
+    await sendLine("GET_LATEST");
+    await sendLine("GET_LOGS");
+
+  }catch(err){
+    console.error(err);
+    alert("לא הצלחתי להתחבר. ודאו שאתם ב-Chrome/Edge ושהמיקרוביט דולק.");
+  }
+}
+
+function onDisconnected(){
+  setConnectedUI(false);
+}
+
+async function disconnect(){
+  if(device?.gatt?.connected) device.gatt.disconnect();
+  setConnectedUI(false);
+}
+
+async function sendLine(str){
+  if(!rxChar) return;
+  const enc = new TextEncoder();
+  await rxChar.writeValue(enc.encode(str + "\n"));
+}
+
+// Incoming BLE UART chunks
+function onNotify(ev){
+  const dec = new TextDecoder();
+  notifyBuffer += dec.decode(ev.target.value);
+
+  // Process full lines
+  let idx;
+  while((idx = notifyBuffer.indexOf("\n")) >= 0){
+    const line = notifyBuffer.slice(0, idx).trim();
+    notifyBuffer = notifyBuffer.slice(idx+1);
+    if(line) handleLine(line);
+  }
+}
+
+// Expected lines:
+// SAMPLE,uptime_ms,soil,light,temp
+// END
+// OK
+function handleLine(line){
+  if(line.startsWith("SAMPLE")){
+    const parts = line.split(",");
+    const uptime_ms = Number(parts[1]);
+    const soil = Number(parts[2]);
+    const light = Number(parts[3]);
+    const temp = Number(parts[4]);
+    const s = { uptime_ms, soil, light, temp };
+
+    // If this is the first sample in a batch and we have a wall-clock moment, reconstruct abs times later.
+    logs.push(s);
+
+    // Update "latest"
+    renderLatest(s);
+  }
+
+  if(line === "END"){
+    reconstructAbsDates();
+    renderTeacher();
+    renderMiniCharts();
+  }
+}
+
+function reconstructAbsDates(){
+  if(logs.length === 0) return;
+
+  // Reconstruct absolute times based on "now" and last uptime
+  const now = new Date();
+  const last = logs[logs.length-1];
+  const startAbs = new Date(now.getTime() - last.uptime_ms);
+
+  logs.forEach(s=>{
+    s.absDate = new Date(startAbs.getTime() + s.uptime_ms);
+  });
+}
+
+/** ------------------------------
+ *  Demo mode (no hardware)
+ *  ------------------------------ */
+function runDemoSync(){
+  // Generate 5 days of samples every 5 minutes
+  logs = [];
+  const intervalMs = 5*60*1000;
+  const totalMs = 5*24*3600*1000;
+  const start = Date.now() - totalMs;
+
+  let soil = 55, light = 40, temp = 22;
+
+  for(let t=0; t<=totalMs; t+=intervalMs){
+    // fake dynamics
+    const hour = new Date(start+t).getHours();
+    light = Math.max(5, Math.min(100, (hour>=7 && hour<=18) ? 70 + 20*Math.sin((hour-7)/11*Math.PI) : 10 + 5*Math.random()));
+    temp  = Math.max(12, Math.min(35, 20 + 6*Math.sin((hour)/24*2*Math.PI) + (light/100)*4 + (Math.random()-0.5)));
+
+    // soil dries slowly, jumps up once per day
+    soil -= 0.3 + Math.random()*0.2;
+    if(hour===8 && Math.random()<0.08) soil += 25; // "watering"
+    soil = Math.max(5, Math.min(95, soil));
+
+    logs.push({
+      uptime_ms: t,
+      soil: Math.round(soil),
+      light: Math.round(light),
+      temp: Number(temp.toFixed(1)),
+      absDate: new Date(start+t)
+    });
+  }
+
+  const latest = logs[logs.length-1];
+  renderLatest(latest);
+  renderTeacher();
+  setConnectedUI(false);
+  lastSyncEl.textContent = "סנכרון אחרון (דמו): " + formatAbsHebrew(new Date());
+}
+
+/** ------------------------------
+ *  UI wiring
+ *  ------------------------------ */
+el("connectBtn").onclick = connectAndSync;
+el("disconnectBtn").onclick = disconnect;
+
+el("pullLatestBtn").onclick = async () => {
+  if(demoMode){ renderLatest(logs[logs.length-1]); return; }
+  await sendLine("GET_LATEST");
+};
+
+el("pullLogsBtn").onclick = async () => {
+  if(demoMode){ runDemoSync(); return; }
+  logs = [];
+  await sendLine("GET_LOGS");
+};
+
+el("clearLogsBtn").onclick = async () => {
+  if(demoMode){ logs=[]; renderTeacher(); return; }
+  if(confirm("בטוח למחוק לוגים מהמיקרוביט?")) await sendLine("CLEAR_LOGS");
+};
+
+// Kid tabs
+document.querySelectorAll("[data-kidtab]").forEach(t=>{
+  t.onclick = ()=>{
+    document.querySelectorAll("[data-kidtab]").forEach(x=>x.classList.remove("active"));
+    t.classList.add("active");
+    const tab = t.dataset.kidtab;
+    el("kidMoodView").classList.toggle("hidden", tab!=="mood");
+    el("kidMiniView").classList.toggle("hidden", tab!=="mini");
+  };
+});
+
+// Teacher tabs
+document.querySelectorAll("[data-teachertab]").forEach(t=>{
+  t.onclick = ()=>{
+    document.querySelectorAll("[data-teachertab]").forEach(x=>x.classList.remove("active"));
+    t.classList.add("active");
+    const tab = t.dataset.teachertab;
+    el("teacherSummaryView").classList.toggle("hidden", tab!=="summary");
+    el("teacherGraphsView").classList.toggle("hidden", tab!=="graphs");
+    el("teacherTableView").classList.toggle("hidden", tab!=="table");
+  };
+});
+
+// Mode switch
+el("modeKidBtn").onclick = ()=>{
+  el("modeKidBtn").classList.add("active");
+  el("modeTeacherBtn").classList.remove("active");
+  el("kidCard").classList.remove("hidden");
+  el("teacherCard").classList.add("hidden");
+};
+el("modeTeacherBtn").onclick = ()=>{
+  el("modeTeacherBtn").classList.add("active");
+  el("modeKidBtn").classList.remove("active");
+  el("teacherCard").classList.remove("hidden");
+  el("kidCard").classList.add("hidden");
+};
+
+// Demo toggle
+el("demoToggleBtn").onclick = ()=>{
+  demoMode = !demoMode;
+  el("demoToggleBtn").textContent = "דמו: " + (demoMode ? "פעיל" : "כבוי");
+  if(demoMode) runDemoSync();
+};
+
+// Initial render
+renderLatest({soil:0, light:0, temp:0});
+</script>
+</body>
+</html>
