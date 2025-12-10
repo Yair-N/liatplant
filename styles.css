@@ -1,0 +1,126 @@
+body {
+    font-family: Arial, sans-serif;
+    background: #f4f7fb;
+    margin: 0;
+    padding: 0;
+    color: #222;
+}
+
+/* HEADER */
+.topbar {
+    background: #fff;
+    padding: 15px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    border-bottom: 2px solid #ddd;
+}
+
+.connect-btn {
+    padding: 8px 15px;
+    background: #3a86ff;
+    border: none;
+    color: #fff;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.connect-btn:hover {
+    background: #2e6cd4;
+}
+
+.status {
+    font-weight: bold;
+}
+
+/* TABS */
+.tabs-container {
+    display: flex;
+    gap: 10px;
+    padding: 10px;
+}
+
+.tab {
+    padding: 10px 15px;
+    background: #e5e9ef;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.tab.active {
+    background: #3a86ff;
+    color: #fff;
+}
+
+/* CONTENT AREA */
+.tab-contents > .plant-panel {
+    display: none;
+    padding: 15px;
+}
+.tab-contents > .plant-panel.active {
+    display: block;
+}
+
+/* LIVE CARD */
+.live-card {
+    background: #fff;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.live-value {
+    font-size: 1.3em;
+    margin: 5px 0;
+}
+
+/* SUMMARY BUTTON */
+.summary-btn {
+    margin-top: 10px;
+    padding: 10px;
+    background: #ffbe0b;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.summary-btn:hover {
+    background: #e0a600;
+}
+
+/* ACCORDION */
+.accordion {
+    margin-top: 20px;
+}
+
+.accordion-item {
+    background: #fff;
+    margin-bottom: 8px;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.accordion-header {
+    padding: 10px;
+    background: #d9e5ff;
+    cursor: pointer;
+}
+
+.accordion-content {
+    display: none;
+    padding: 10px;
+    background: #fafafa;
+}
+
+.accordion-item.open .accordion-content {
+    display: block;
+}
+
+/* DEBUG LOG */
+.log-box {
+    background: #111;
+    color: #0f0;
+    height: 150px;
+    overflow-y: scroll;
+    padding: 10px;
+    border-top: 2px solid #333;
+    font-family: monospace;
+}
