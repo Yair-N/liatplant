@@ -543,7 +543,17 @@ async function connectSerial(){
       return;
     }
 
-    serialPort = await navigator.serial.requestPort({});
+console.log("Calling requestPort...");
+let chosen;
+try {
+    chosen = await navigator.serial.requestPort({});
+    console.log("User selected:", chosen);
+} catch (e) {
+    console.error("ERROR inside requestPort:", e);
+    alert("requestPort failed: " + e);
+    return;
+}
+serialPort = chosen;
     await serialPort.open({ baudRate: 115200 });
 
     setConnectedUI(true);
